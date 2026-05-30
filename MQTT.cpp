@@ -7,9 +7,10 @@ MQTT::MQTT() {
   preState = -1000;
 }
 
+void MQTT::setCACert(char* ca) { wifiClient.setCACert(ca); }
 void MQTT::init() {
   File f = SPIFFS.open("/certificate.ca", "r");
-  if (f) {
+  /*if (f) {
     uint16_t i = 0;
     while (f.available())
       ca[i++] = f.read();
@@ -18,7 +19,7 @@ void MQTT::init() {
     wifiClient.setCACert(ca);
     
   } else
-    Serial.println("Certificate isn't exists");
+    Serial.println("Certificate isn't exists");*/
   
   client.setBufferSize(4096);
   client.setKeepAlive(60);

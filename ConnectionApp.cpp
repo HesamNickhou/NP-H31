@@ -10,6 +10,7 @@ static void shortcut_MQTTConnected(bool isConnected)                            
 static void shortcut_wifiDataReceived(char* command, uint8_t* payload, uint16_t size) { toThis1->WifiDataReceived(command, payload, size); }
 static void shortcut_DataTransformListener(char* command, char* payload)           { toThis1->DataTransformListener(command, payload); }
 static void shortcut_OTAListener(uint8_t step, uint8_t percent)                          { toThis1->OTAListener(step, percent); }
+static void shortcut_CAListener(uint8_t state, uint8_t data)                          { toThis1->CAListener(state, data); }
 
 ConnectionApp::ConnectionApp(QueueHandle_t send, QueueHandle_t receive) {
   toThis1 = this;
@@ -168,17 +169,39 @@ void ConnectionApp::WifiDataReceived(char* command, uint8_t* payload, uint16_t s
     ESP.restart();
   }
     
-  else if (strcmp(command, "Certificate") == 0) {
+  /*else if (strcmp(command, "Certificate") == 0) {
     uint16_t i = 0;
     File f = SPIFFS.open("/certificate.ca", "w");
     while (i < size)
       f.write(payload[i++]);
     f.close();
     wifi.send("Certificate", "Received");
-  }
+  }*/
   
   else
     dataTransform.sendData(command, (char*) payload, size);
+}
+
+/*
+  * @name CAListener
+  * @brief A callback to Certificate Authority(CA) data when is received in WiFi library
+  * When every byte of CA is received, this callback will be called.  
+  * @param state Which shows is start, middle or end of CA stream
+  * @param data The one byte of CA which is received
+*/
+void ConnectionApp::CAListener(uint8_t state, uint8_t data) {
+  if (state == 1) {
+    fCA = SPIFFS.open("/certificate.ca", "w");
+    fCA.write(data);
+  }
+
+  else if (state == 2) 
+    fCA.write(data);
+
+  else if (state == 3) { 
+    fCA.close(); 
+    wifi.send("Certificate", "Received");
+  }
 }
 
 void ConnectionApp::DataTransformListener(char* command, char* payload) {
@@ -398,12 +421,14 @@ void ConnectionApp::setWDT(bool value) {
     esp_task_wdt_delete(NULL);
 }
 
-void ConnectionApp::init() {
+void ConnectionApp::init(char* ca) {
   mqtt.setOnMQTTConnection(shortcut_MQTTConnected);
+  mqtt.setCACert(ca);
   wifi.setOnWifiConnection(shortcut_wifiConnection);
   wifi.setOnDataReceived(shortcut_wifiDataReceived);
   wifi.setOnRSSIListener(shortcut_rssiListener);
   wifi.setOnRestartListener([] { toThis1->dataTransform.sendData("Internal.WIFI.Restart", ""); });
+  wifi.setCAListener(shortcut_CAListener);
 
   if (Mode == 1) {
     Serial.print("\n\t");

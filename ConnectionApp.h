@@ -24,6 +24,7 @@ class ConnectionApp {
     OTA ota;
     OneWire oneWire;
     DallasTemperature temperature;
+    File fCA;
     bool mqttConnected = false, firstTime = true, otaStarted, firstCertificate = true, server_error = false;
     void sendCommand(const char* command, const char* payload);
     void setWDT(bool value);
@@ -31,7 +32,7 @@ class ConnectionApp {
     Wifi wifi;
     ConnectionApp(QueueHandle_t sender, QueueHandle_t receiver);
     bool doMainTimer = false;
-    void init();
+    void init(char* ca);
     void MainTimer();
     void setResetReason(ResetReason interface);
     void wifiConnection(bool isConnected, const char* reason);
@@ -41,5 +42,6 @@ class ConnectionApp {
     void MQTTReceived(char* topic, uint8_t* payload, uint16_t length);    
     void DataTransformListener(char* command, char* payload);
     void OTAListener(uint8_t step, uint8_t percent);
+    void CAListener(uint8_t state, uint8_t data);
     void loop();
 };

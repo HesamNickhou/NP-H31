@@ -11,7 +11,7 @@ class MQTT {
     ConnectionListener connectionListener = NULL;
     WiFiClientSecure wifiClient;
     PubSubClient client;
-    char gmail[50], mac[20], password[40], topicSend[86], ca[2048], willTopic[60];
+    char gmail[50], mac[20], password[40], topicSend[86], willTopic[60];
     uint32_t lastTime, networkConnecting;
     bool startMQTT, preConnect;
     int preState;
@@ -20,6 +20,7 @@ class MQTT {
   public:
     MQTT();
     void init();
+    void setCACert(char* ca);
     void setCallBack(CallBack callBack);
     void Connect(const char* server, uint16_t port, const char* mac, const char* gmail, const char* password);
     void send(const char* command, const char* data);

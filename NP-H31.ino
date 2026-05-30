@@ -4,6 +4,7 @@
 #include "SPIFFS.h"
 
 QueueHandle_t receiveQueue, sendQueue;
+char ca[4096];
 uint32_t resetTimer;
 uint8_t resetCounter;
 
@@ -24,6 +25,20 @@ void ResetReason(char* reason) {
   }
 }
 
+void loadCA() {
+  File f = SPIFFS.open("/certificate.ca", "r");
+  if (f) {
+    uint16_t i = 0;
+    while (f.available())
+      ca[i++] = f.read();
+    ca[i] = NULL;
+    f.close();
+  }
+  
+  else
+    Serial.println("Certificate isn't exists");
+}
+
 void coreTask(void *parameter) {
   MainApp app(sendQueue, receiveQueue);
   app.setResetReason(ResetReason);
@@ -38,7 +53,7 @@ void coreTask(void *parameter) {
 void connectionTask(void *parameter) {
   ConnectionApp app(receiveQueue, sendQueue);
   app.setResetReason(ResetReason);
-  app.init();
+  app.init(ca);
   while (true) {
     app.loop();
     delay(1);
@@ -72,6 +87,7 @@ void setup(void) {
   }
   SPIFFS.open("/reset.dat", "w").write(resetCounter);
   SPIFFS.open("/ResetCause.dat", "a").write(esp_reset_reason());
+  loadCA();
   
   receiveQueue = xQueueCreate(4096, 1);
   sendQueue    = xQueueCreate(4096, 1);

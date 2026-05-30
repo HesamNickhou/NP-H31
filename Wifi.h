@@ -10,6 +10,7 @@ class Wifi {
     typedef void (*DataListener) (char* command, uint8_t* payload, uint16_t size);
     typedef void (*ConnectedDevice) (uint8_t num);
     typedef void (*RSSIListener) (uint8_t quality);
+    typedef void (*CAListener) (uint8_t state, uint8_t data);
     typedef void (*RestartListener) ();
 
     const char* reasons[9] PROGMEM = {
@@ -25,7 +26,7 @@ class Wifi {
       };
     unsigned long lastTime, rssiTime;
     uint16_t i, count, len;
-    uint8_t payload[2000], step, status, mode, connectedNo, cb, wifiReboot;
+    uint8_t payload[2000], step, status, mode, connectedNo, cb, wifiReboot, caState;
     char command[50];
     bool initialized, inReading, doStop;
     WiFiServer server;
@@ -37,6 +38,7 @@ class Wifi {
     DataListener dataListener;
     RSSIListener rssiListener;
     RestartListener restartListener;
+    CAListener         caListener;
 
     const char* getCause(uint8_t status) {
       switch (status) {
@@ -59,6 +61,7 @@ class Wifi {
           command[len] = NULL;
           step = 2;
           i = 0;
+          caState = (strcmp(command, "Certificate") == 0);
           result = true;
         }
         else
@@ -68,7 +71,6 @@ class Wifi {
     }
 
     bool readLength() {
-      bool result = false;
       if (step == 2) {
         if (cb == 10) {
           payload[i] = NULL;
@@ -82,13 +84,36 @@ class Wifi {
             len  = 0;
           }
           i = 0;
-          result = true;
+          return true;
         }
 
         else
           payload[i++] = cb;
       }
-      return result;
+      return (step == 2);
+    }
+
+    bool isCA() {
+      if (caState > 0) { //Certificate is incoming...
+        if (caState == 1) { //Create file
+          caState = 2;
+          i++;
+          caListener(1, cb);
+        }
+
+        else if (caState == 2) { //Write byte to file
+          caListener(2, cb);
+          if (++i >= len) {
+            caState = 0;
+            caListener(3, 0);
+            i    = 0;
+            len  = 0;
+            step = 1;
+          }
+        }
+        return true;
+      }
+      return false;
     }
 
     bool readPayload() {
@@ -134,6 +159,7 @@ class Wifi {
       rssiTime    = 0;
       wifiReboot  = 15;
       lastTime    = 1;
+      caState     = 0;
       remote      = IPAddress(0,0,0,0);
     }
 
@@ -217,6 +243,7 @@ class Wifi {
     void setOnConnectedDevice(ConnectedDevice interface) { connectedDevice = interface; }
     void setOnRSSIListener(RSSIListener interface) { rssiListener = interface; }
     void setOnRestartListener(RestartListener interface) { restartListener = interface; }
+    void setCAListener(CAListener interface)              { caListener         = interface; }
   
     void loop() {
       if (mode > 1)
@@ -270,6 +297,7 @@ class Wifi {
           cb = client.read();
           if (readCommand()) continue;
           if (readLength())  continue;
+          if (isCA())        continue;
           if (readPayload()) break;
         }
 
